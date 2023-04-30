@@ -4,7 +4,7 @@ import datetime
 import pathlib
 
 winID = "fi.optipari.toolkit"
-version = 'v1.0.0'
+version = 'v1.1.0'
 
 ui = fusion.UIManager
 dispatcher = bmd.UIDispatcher(ui)
@@ -199,7 +199,7 @@ def OnTestFunc(ev):
     print(path)
     print(filename)
 
-    url = 'https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/owid-covid-data.csv'
+    url = 'https://raw.githubusercontent.com/ekelokorpi/resolve-toolkit/main/Toolkit.py'
     r = requests.get(url, allow_redirects=True)
 
     open(path + filename, 'wb').write(r.content)
