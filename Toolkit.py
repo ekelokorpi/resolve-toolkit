@@ -4,7 +4,7 @@ import datetime
 import pathlib
 
 winID = "fi.optipari.toolkit"
-version = 'v1.1.0'
+version = 'v1.0.0'
 
 ui = fusion.UIManager
 dispatcher = bmd.UIDispatcher(ui)
@@ -28,7 +28,7 @@ win = dispatcher.AddWindow({
         ui.Button({ 'ID': 'ColorClips',  'Text': "Create shot numbers based on TC and Duration" }),
         ui.Button({ 'ID': 'ClearShots',  'Text': "Clear shot numbers" }),
 
-        ui.Button({ 'ID': 'TestFunc',  'Text': "Test" }),
+        ui.Button({ 'ID': 'UpdateToolkit',  'Text': "Update toolkit" }),
     ]))
 
 projectManager = resolve.GetProjectManager()
@@ -191,20 +191,14 @@ def OnShowConsole(ev):
     fusion.ShowConsole()
 
 import inspect
-import requests
+import urllib.request
 
-def OnTestFunc(ev):
+def OnUpdateToolkit(ev):
     filename = inspect.getframeinfo(inspect.currentframe()).filename
-    path     = os.path.dirname(os.path.abspath(filename))
-    print(path)
-    print(filename)
 
     url = 'https://raw.githubusercontent.com/ekelokorpi/resolve-toolkit/main/Toolkit.py'
-    r = requests.get(url, allow_redirects=True)
-
-    open(path + filename, 'wb').write(r.content)
-
-    # dir_path = os.path.dirname(os.path.realpath(__file__))
+    a,b = urllib.request.urlretrieve(url, filename)
+    print(b)
 
 win.On[winID].Close = OnClose
 win.On['ImportMC'].Clicked = OnExec
@@ -213,7 +207,7 @@ win.On['ClearShots'].Clicked = OnClearShots
 win.On['ImportMultiMC'].Clicked = OnImportMultiMC
 win.On['ShowConsole'].Clicked = OnShowConsole
 win.On['ImportMultiMCCurrent'].Clicked = OnImportMultiMCCurrent
-win.On['TestFunc'].Clicked = OnTestFunc
+win.On['UpdateToolkit'].Clicked = OnUpdateToolkit
 
 
 
