@@ -3,8 +3,8 @@ import os
 import datetime
 import pathlib
 
-winID = "fi.optipari.toolkit"
-version = 'v1.0.0'
+winID = "com.kelokorpi.toolkit"
+version = 'v1.1.0'
 
 ui = fusion.UIManager
 dispatcher = bmd.UIDispatcher(ui)
@@ -17,18 +17,20 @@ if win:
 
 win = dispatcher.AddWindow({
         'ID': winID,
-        'Geometry': [ 300, 300, 400, 200 ],
+        'Geometry': [ 300, 300, 400, 300 ],
         'WindowTitle': "Resolve Toolkit " + version,
     },
     ui.VGroup([
         ui.Button({ 'ID': 'ImportMultiMCCurrent',  'Text': "Import media folders into current folder" }),
         ui.Button({ 'ID': 'ImportMultiMC',  'Text': "Import media folders into subfolders" }),
         ui.Button({ 'ID': 'ImportMC',  'Text': "Import Canon RAW + PROXY folder" }),
+
+        ui.Button({ 'ID': 'CopyAssets',  'Text': "Copy and relink assets to new folder" }),
         
         ui.Button({ 'ID': 'ColorClips',  'Text': "Create shot numbers based on TC and Duration" }),
         ui.Button({ 'ID': 'ClearShots',  'Text': "Clear shot numbers" }),
 
-        ui.Button({ 'ID': 'UpdateToolkit',  'Text': "Update toolkit" }),
+        # ui.Button({ 'ID': 'UpdateToolkit',  'Text': "Update toolkit" }),
     ]))
 
 projectManager = resolve.GetProjectManager()
@@ -195,10 +197,26 @@ import urllib.request
 
 def OnUpdateToolkit(ev):
     filename = inspect.getframeinfo(inspect.currentframe()).filename
-
     url = 'https://raw.githubusercontent.com/ekelokorpi/resolve-toolkit/main/Toolkit.py'
     a,b = urllib.request.urlretrieve(url, filename)
     print(b)
+
+import shutil
+
+def OnCopyAssets(ev):
+    selectedPath = fusion.RequestDir()
+    print(selectedPath)
+    if selectedPath == None:
+        return
+    currentFolder = mediaPool.GetCurrentFolder()
+    files = currentFolder.GetClipList()
+    for file in files:
+        fileType = file.GetClipProperty('Type')
+        if fileType == 'Still' or fileType == 'Audio':
+            filePath = file.GetClipProperty('File Path')
+            newFile = shutil.copy(filePath, selectedPath)
+            file.ReplaceClip(newFile)
+
 
 win.On[winID].Close = OnClose
 win.On['ImportMC'].Clicked = OnExec
@@ -208,7 +226,7 @@ win.On['ImportMultiMC'].Clicked = OnImportMultiMC
 win.On['ShowConsole'].Clicked = OnShowConsole
 win.On['ImportMultiMCCurrent'].Clicked = OnImportMultiMCCurrent
 win.On['UpdateToolkit'].Clicked = OnUpdateToolkit
-
+win.On['CopyAssets'].Clicked = OnCopyAssets
 
 
 win.Show()
