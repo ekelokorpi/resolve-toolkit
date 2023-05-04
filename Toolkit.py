@@ -4,7 +4,11 @@ import datetime
 import pathlib
 
 winID = "com.kelokorpi.toolkit"
-version = 'v1.1.0'
+version = 'v1.2.0'
+
+# Settings
+supportedMediaFiles = ['.MXF', '.MP4', '.MOV']
+clipColors = ['Orange', 'Blue', 'Pink', 'Green', 'Yellow', 'Teal', 'Violet', 'Brown']
 
 ui = fusion.UIManager
 dispatcher = bmd.UIDispatcher(ui)
@@ -15,23 +19,29 @@ if win:
     win.Raise()
     exit()
 
+buttons = [
+    ui.Button({ 'ID': 'ImportMultiMCCurrent',  'Text': "Import media folders into current folder" }),
+    ui.Button({ 'ID': 'ImportMultiMC',  'Text': "Import media folders into subfolders" }),
+    ui.Button({ 'ID': 'ImportMC',  'Text': "Import Canon RAW + PROXY folder" }),
+
+    ui.Label(),
+
+    ui.Button({ 'ID': 'CopyAssets',  'Text': "Consolidate assets to new folder" }),
+    
+    ui.Button({ 'ID': 'ColorClips',  'Text': "Color and number clips based on TC and Duration" }),
+    # ui.Button({ 'ID': 'ClearShots',  'Text': "Clear shot numbers" }),
+
+    ui.Label(),
+
+    ui.Button({ 'ID': 'UpdateToolkit',  'Text': "Update toolkit" }),
+]
+
 win = dispatcher.AddWindow({
         'ID': winID,
         'Geometry': [ 300, 300, 400, 300 ],
         'WindowTitle': "Resolve Toolkit " + version,
     },
-    ui.VGroup([
-        ui.Button({ 'ID': 'ImportMultiMCCurrent',  'Text': "Import media folders into current folder" }),
-        ui.Button({ 'ID': 'ImportMultiMC',  'Text': "Import media folders into subfolders" }),
-        ui.Button({ 'ID': 'ImportMC',  'Text': "Import Canon RAW + PROXY folder" }),
-
-        ui.Button({ 'ID': 'CopyAssets',  'Text': "Copy and relink assets to new folder" }),
-        
-        ui.Button({ 'ID': 'ColorClips',  'Text': "Create shot numbers based on TC and Duration" }),
-        ui.Button({ 'ID': 'ClearShots',  'Text': "Clear shot numbers" }),
-
-        # ui.Button({ 'ID': 'UpdateToolkit',  'Text': "Update toolkit" }),
-    ]))
+    ui.VGroup(buttons))
 
 projectManager = resolve.GetProjectManager()
 project = projectManager.GetCurrentProject()
@@ -47,14 +57,16 @@ def FindProxy(fileName, mediaItem, path):
                 mediaItem.LinkProxyMedia(root + '/' + f)
 
 def ImportClips(path):
+    DisableAllButtons()
+    print('Working...')
     for (root, dirs, file) in os.walk(path):
         for f in file:
             if '.CRM' in f:
                 print(root + '/' + f)
                 clips = mediaPool.ImportMedia(root + '/' + f)
                 FindProxy(f, clips[0], path)
-
-supportedMediaFiles = ['.MXF', '.MP4', '.MOV']
+    print('DONE')
+    EnableAllButtons()
 
 def ImportClipsToFolder(path, folder):
     rootFolder = mediaPool.GetRootFolder()
@@ -63,6 +75,8 @@ def ImportClipsToFolder(path, folder):
 
     if folder == None:
         subFolderCreated = True
+
+    clipsToImport = []
 
     for (root, dirs, file) in os.walk(path):
         for f in file:
@@ -73,21 +87,30 @@ def ImportClipsToFolder(path, folder):
                     mediaPool.SetCurrentFolder(newFolder)
                     subFolderCreated = True
 
-                clips = mediaPool.ImportMedia(root + '/' + f)
+                # clips = mediaPool.ImportMedia(root + '/' + f)
+                clipsToImport.append(root + '/' + f)
                 # FindProxy(f, clips[0], path)
+
+    mediaPool.ImportMedia(clipsToImport)
 
 def OnClose(ev):
     dispatcher.ExitLoop()
 
 def ImportMultiClips(path):
-    rootFolder = mediaPool.GetRootFolder()
-    # mediaPool.AddSubFolder(rootFolder, 'Test')
+    DisableAllButtons()
+    print('Working...')
     for (root, dirs, files) in os.walk(path):
         # print(dirs)
         for curDir in dirs:
             # print(curDir)
+            if curDir == 'CacheClip':
+                continue
+            if curDir == 'ProxyMedia':
+                continue
             ImportClipsToFolder(root + '/' + curDir, curDir)
         break
+    print('DONE')
+    EnableAllButtons()
 
 def OnImportMultiMC(ev):
     selectedPath = fusion.RequestDir()
@@ -95,10 +118,18 @@ def OnImportMultiMC(ev):
         ImportMultiClips(selectedPath)
 
 def ImportMultiClipsToCurrentFolder(path):
+    DisableAllButtons()
+    print('Working...')
     for (root, dirs, files) in os.walk(path):
         for curDir in dirs:
+            if curDir == 'CacheClip':
+                continue
+            if curDir == 'ProxyMedia':
+                continue
             ImportClipsToFolder(root + '/' + curDir, None)
         break
+    print('DONE')
+    EnableAllButtons()
 
 def OnImportMultiMCCurrent(ev):
     selectedPath = fusion.RequestDir()
@@ -112,9 +143,7 @@ def OnExec(ev):
         ImportClips(selectedPath)
 
 coloredClips = []
-clipColors = ['Orange', 'Blue', 'Pink', 'Green', 'Yellow', 'Teal', 'Violet', 'Brown']
 currentColor = 0
-
 curShotNumber = 1
 
 def TimecodeToSeconds(timecode):
@@ -146,7 +175,7 @@ def SearchSimilar(targetClip, clips):
 
         if abs(targetStart - clipStart) <= 60 and abs(targetDuration - clipDuration) <= 60:
             # print("MATCH FOUND!")
-            # clip.SetClipColor(clipColors[currentColor])
+            clip.SetClipColor(clipColors[currentColor])
             clip.SetMetadata('Camera ID', str(currentCamera))
             clip.SetClipProperty('Shot', str(curShotNumber))
             currentCamera = currentCamera + 1
@@ -154,7 +183,7 @@ def SearchSimilar(targetClip, clips):
             similarFound = True
 
     if similarFound == True:
-        # targetClip.SetClipColor(clipColors[currentColor])
+        targetClip.SetClipColor(clipColors[currentColor])
         targetClip.SetMetadata('Camera ID', '1')
         targetClip.SetClipProperty('Shot', str(curShotNumber))
         coloredClips.append(targetClip)
@@ -165,6 +194,8 @@ def SearchSimilar(targetClip, clips):
 
 
 def OnColorClips(ev):
+    DisableAllButtons()
+    print('Working...')
     global coloredClips
     global curShotNumber
     curShotNumber = 1
@@ -179,6 +210,8 @@ def OnColorClips(ev):
         if clip in coloredClips:
             continue
         SearchSimilar(clip, clips)
+    print('DONE')
+    EnableAllButtons()
 
 def OnClearShots(ev):
     currentFolder = mediaPool.GetCurrentFolder()
@@ -196,10 +229,14 @@ import inspect
 import urllib.request
 
 def OnUpdateToolkit(ev):
+    DisableAllButtons()
+    print('Working...')
     filename = inspect.getframeinfo(inspect.currentframe()).filename
     url = 'https://raw.githubusercontent.com/ekelokorpi/resolve-toolkit/main/Toolkit.py'
     a,b = urllib.request.urlretrieve(url, filename)
     print(b)
+    print('DONE')
+    EnableAllButtons()
 
 import shutil
 
@@ -208,6 +245,8 @@ def OnCopyAssets(ev):
     print(selectedPath)
     if selectedPath == None:
         return
+    DisableAllButtons()
+    print('Working...')
     currentFolder = mediaPool.GetCurrentFolder()
     files = currentFolder.GetClipList()
     for file in files:
@@ -216,7 +255,16 @@ def OnCopyAssets(ev):
             filePath = file.GetClipProperty('File Path')
             newFile = shutil.copy(filePath, selectedPath)
             file.ReplaceClip(newFile)
+    print('DONE')
+    EnableAllButtons()
 
+def DisableAllButtons():
+    for button in buttons:
+        button.Enabled = False
+
+def EnableAllButtons():
+    for button in buttons:
+        button.Enabled = True
 
 win.On[winID].Close = OnClose
 win.On['ImportMC'].Clicked = OnExec
@@ -228,7 +276,5 @@ win.On['ImportMultiMCCurrent'].Clicked = OnImportMultiMCCurrent
 win.On['UpdateToolkit'].Clicked = OnUpdateToolkit
 win.On['CopyAssets'].Clicked = OnCopyAssets
 
-
 win.Show()
 dispatcher.RunLoop()
-
