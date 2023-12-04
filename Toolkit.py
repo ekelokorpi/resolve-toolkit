@@ -2,12 +2,13 @@ import sys
 import os
 import datetime
 import pathlib
+import avb
 
 winID = "com.kelokorpi.toolkit"
-version = 'v1.2.0'
+version = 'v1.3.0'
 
 # Settings
-supportedMediaFiles = ['.MXF', '.MP4', '.MOV']
+supportedMediaFiles = ['.MXF', '.MP4', '.MOV', '.WAV', '.CRM']
 clipColors = ['Orange', 'Blue', 'Pink', 'Green', 'Yellow', 'Teal', 'Violet', 'Brown']
 
 ui = fusion.UIManager
@@ -23,6 +24,7 @@ buttons = [
     ui.Button({ 'ID': 'ImportMultiMCCurrent',  'Text': "Import media folders into current folder" }),
     ui.Button({ 'ID': 'ImportMultiMC',  'Text': "Import media folders into subfolders" }),
     ui.Button({ 'ID': 'ImportMC',  'Text': "Import Canon RAW + PROXY folder" }),
+    ui.Button({ 'ID': 'ImportAvid',  'Text': "Import Avid bins" }),
 
     ui.Label(),
 
@@ -131,10 +133,29 @@ def ImportMultiClipsToCurrentFolder(path):
     print('DONE')
     EnableAllButtons()
 
+def ImportMultiAudioToCurrentFolder(path):
+    DisableAllButtons()
+    print('Working...')
+    for (root, dirs, files) in os.walk(path):
+        for curDir in dirs:
+            if curDir == 'CacheClip':
+                continue
+            if curDir == 'ProxyMedia':
+                continue
+            ImportClipsToFolder(root + '/' + curDir, None)
+        break
+    print('DONE')
+    EnableAllButtons()
+
 def OnImportMultiMCCurrent(ev):
     selectedPath = fusion.RequestDir()
     if selectedPath:
         ImportMultiClipsToCurrentFolder(selectedPath)
+
+def OnImportMultiAudioCurrent(ev):
+    selectedPath = fusion.RequestDir()
+    if selectedPath:
+        ImportMultiAudioToCurrentFolder(selectedPath)
 
 def OnExec(ev):
     selectedPath = fusion.RequestDir()
@@ -258,6 +279,57 @@ def OnCopyAssets(ev):
     print('DONE')
     EnableAllButtons()
 
+def OnImportAvid(ev):
+    currentFolder = mediaPool.GetCurrentFolder()
+
+    selectedPath = fusion.RequestDir()
+    print(selectedPath)
+    if selectedPath == None:
+        return
+    DisableAllButtons()
+    print('Working...')
+
+    for (root, dirs, files) in os.walk(selectedPath):
+        for f in files:
+            fileExt = pathlib.Path(f).suffix
+            if fileExt.upper() == '.AVB':
+                print(f)
+
+                folderName = f.split('.', 1)[0]
+
+                folders = currentFolder.GetSubFolders()
+                folderFound = False
+                for i in folders:
+                  if folders[i].GetName() == folderName:
+                    newFolder = folders[i]
+                    folderFound = True
+                    break
+
+                if folderFound == False:
+                  newFolder = mediaPool.AddSubFolder(currentFolder, folderName)
+
+                with avb.open(root + '/' + f) as avbfile:
+
+                  for mob in avbfile.content.mobs:
+
+                    if mob.mob_type_id == 1 or mob.mob_type_id == 2:
+                      clipName = mob.name.split('.', 1)[0]
+                      clipName = clipName.split('_P', 1)[0]
+                      print(clipName)
+
+                      mediaPool.SetCurrentFolder(currentFolder)
+                      clips = currentFolder.GetClipList()
+                      for clip in clips:
+                          filename = clip.GetName()
+                          filename = filename.split('.', 1)[0]
+                          if filename == clipName:
+                            print('MATCH FOUND!')
+                            mediaPool.MoveClips([clip], newFolder)
+
+    print('DONE')
+    EnableAllButtons()
+
+
 def DisableAllButtons():
     for button in buttons:
         button.Enabled = False
@@ -273,8 +345,10 @@ win.On['ClearShots'].Clicked = OnClearShots
 win.On['ImportMultiMC'].Clicked = OnImportMultiMC
 win.On['ShowConsole'].Clicked = OnShowConsole
 win.On['ImportMultiMCCurrent'].Clicked = OnImportMultiMCCurrent
+win.On['ImportMultiAudioCurrent'].Clicked = OnImportMultiAudioCurrent
 win.On['UpdateToolkit'].Clicked = OnUpdateToolkit
 win.On['CopyAssets'].Clicked = OnCopyAssets
+win.On['ImportAvid'].Clicked = OnImportAvid
 
 win.Show()
 dispatcher.RunLoop()
