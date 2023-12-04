@@ -3,9 +3,10 @@ import os
 import datetime
 import pathlib
 import avb
+from reportlab.pdfgen.canvas import Canvas
 
 winID = "com.kelokorpi.toolkit"
-version = 'v1.3.0'
+version = 'v1.4.0'
 
 # Settings
 supportedMediaFiles = ['.MXF', '.MP4', '.MOV', '.WAV', '.CRM']
@@ -31,6 +32,8 @@ buttons = [
     ui.Button({ 'ID': 'CopyAssets',  'Text': "Consolidate assets to new folder" }),
     
     ui.Button({ 'ID': 'ColorClips',  'Text': "Color and number clips based on TC and Duration" }),
+
+    ui.Button({ 'ID': 'Musatiedot',  'Text': "Generate musatiedot file" }),
     # ui.Button({ 'ID': 'ClearShots',  'Text': "Clear shot numbers" }),
 
     ui.Label(),
@@ -214,6 +217,89 @@ def SearchSimilar(targetClip, clips):
         curShotNumber = curShotNumber + 1
 
 
+class MusicInfo:
+  def __init__(self, artist, song, duration):
+    self.artist = artist
+    self.song = song
+    self.duration = duration
+
+def OnMusatiedot(ev):
+    DisableAllButtons()
+    print('Working...')
+
+    # Works with Epidemic Sound and Artlist
+
+    musicInfos = []
+
+    project = projectManager.GetCurrentProject()
+
+    timeline = project.GetCurrentTimeline()
+    frameRate = timeline.GetSetting('timelineFrameRate')
+    timelineName = timeline.GetName()
+    projectName = project.GetName()
+    audioTrackCount = timeline.GetTrackCount("audio")
+    for i in range(audioTrackCount):
+        items = timeline.GetItemListInTrack("audio", i + 1)
+        for item in items:
+            name = item.GetName()
+            if ".wav" in name and " - " in name:
+                isEpidemic = False
+                if "ES_" in name:
+                    isEpidemic = True
+                name = name.replace("ES_", "")
+                name = name.replace(".wav", "")
+                name = name.split(" - ")
+                itemDuration = item.GetDuration()
+                durationInSeconds = itemDuration / frameRate
+
+                if isEpidemic == True:
+                    artistName = name[1]
+                    songName = name[0]
+                else:
+                    artistName = name[0]
+                    songName = name[1]
+
+                found = False
+                for musicInfo in musicInfos:
+                    if musicInfo.artist == artistName and musicInfo.song == songName:
+                        musicInfo.duration = musicInfo.duration + durationInSeconds
+                        found = True
+                        break
+
+                if found is False:
+                    musicInfos.append(MusicInfo(artistName, songName, durationInSeconds))
+
+    
+    if len(musicInfos) > 0:
+        selectedPath = fusion.RequestDir()
+        if selectedPath:
+            fileName = projectName.replace(" ", "_").lower() + "_musatiedot.pdf"
+
+            canvas = Canvas(selectedPath + fileName)
+            y = 800
+            lineHeight = 20
+            canvas.drawString(72, y, projectName)
+            y = y - lineHeight;
+            canvas.drawString(72, y, "Musiikkitiedot")
+            y = y - lineHeight * 2;
+            for musicInfo in musicInfos:
+                canvas.drawString(72, y, musicInfo.artist + ' - ' + musicInfo.song)
+                y = y - lineHeight;
+                canvas.drawString(72, y, str(datetime.timedelta(seconds=round(musicInfo.duration))))
+                y = y - lineHeight * 2;
+            canvas.save()
+                
+    print('MUSATIEDOT:')
+    print("")
+    print(projectName)
+    print("")
+    for musicInfo in musicInfos:
+        print(musicInfo.artist + ' - ' + musicInfo.song)
+        print(str(datetime.timedelta(seconds=round(musicInfo.duration))))
+        print("")
+    print('DONE')
+    EnableAllButtons()
+
 def OnColorClips(ev):
     DisableAllButtons()
     print('Working...')
@@ -341,6 +427,7 @@ def EnableAllButtons():
 win.On[winID].Close = OnClose
 win.On['ImportMC'].Clicked = OnExec
 win.On['ColorClips'].Clicked = OnColorClips
+win.On['Musatiedot'].Clicked = OnMusatiedot
 win.On['ClearShots'].Clicked = OnClearShots
 win.On['ImportMultiMC'].Clicked = OnImportMultiMC
 win.On['ShowConsole'].Clicked = OnShowConsole
