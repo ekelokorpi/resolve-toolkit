@@ -6,7 +6,7 @@ import avb
 from reportlab.pdfgen.canvas import Canvas
 
 winID = "com.kelokorpi.toolkit"
-version = 'v1.4.0'
+version = 'v1.5.0'
 
 # Settings
 supportedMediaFiles = ['.MXF', '.MP4', '.MOV', '.WAV', '.CRM']
@@ -30,10 +30,10 @@ buttons = [
     ui.Label(),
 
     ui.Button({ 'ID': 'CopyAssets',  'Text': "Consolidate assets to new folder" }),
-    
     ui.Button({ 'ID': 'ColorClips',  'Text': "Color and number clips based on TC and Duration" }),
-
     ui.Button({ 'ID': 'Musatiedot',  'Text': "Generate musatiedot file" }),
+    ui.Button({ 'ID': 'CalculateClips',  'Text': "Calculate total size of timeline clips" }),
+    ui.Button({ 'ID': 'CopyRelinkClips',  'Text': "Copy and relink clips from timeline to new location" }),
     # ui.Button({ 'ID': 'ClearShots',  'Text': "Clear shot numbers" }),
 
     ui.Label(),
@@ -43,7 +43,7 @@ buttons = [
 
 win = dispatcher.AddWindow({
         'ID': winID,
-        'Geometry': [ 300, 300, 400, 300 ],
+        'Geometry': [ 300, 300, 400, 500 ],
         'WindowTitle': "Resolve Toolkit " + version,
     },
     ui.VGroup(buttons))
@@ -238,11 +238,13 @@ def OnMusatiedot(ev):
     timelineName = timeline.GetName()
     projectName = project.GetName()
     audioTrackCount = timeline.GetTrackCount("audio")
+    print('test')
     for i in range(audioTrackCount):
         items = timeline.GetItemListInTrack("audio", i + 1)
+        print('test2')
         for item in items:
             name = item.GetName()
-            if ".wav" in name and " - " in name:
+            if ".wav" in name and " - " in name and not "SFX" in name:
                 isEpidemic = False
                 if "ES_" in name:
                     isEpidemic = True
@@ -250,7 +252,11 @@ def OnMusatiedot(ev):
                 name = name.replace(".wav", "")
                 name = name.split(" - ")
                 itemDuration = item.GetDuration()
-                durationInSeconds = itemDuration / frameRate
+                print('test3')
+                print(itemDuration)
+                print(frameRate)
+                durationInSeconds = int(itemDuration) / int(frameRate)
+                print('test4')
 
                 if isEpidemic == True:
                     artistName = name[1]
@@ -347,6 +353,70 @@ def OnUpdateToolkit(ev):
 
 import shutil
 
+def convert_bytes(num):
+    for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+        if num < 1024.0:
+            return "%3.1f %s" % (num, x)
+        num /= 1024.0
+
+def OnCalculateClips(ev):
+    DisableAllButtons()
+    print('Working...')
+
+    totalSize = 0
+
+    timeline = project.GetCurrentTimeline()
+    videoTrackCount = timeline.GetTrackCount("video")
+    for i in range(videoTrackCount):
+        items = timeline.GetItemListInTrack("video", i + 1)
+        for item in items:
+            name = item.GetName()
+            mediaItem = item.GetMediaPoolItem()
+            enabled = item.GetClipEnabled()
+            if mediaItem != None and enabled == True:
+                path = mediaItem.GetClipProperty('File Path')
+                baseName = os.path.basename(path)
+                file_stats = os.stat(path)
+                totalSize = totalSize + file_stats.st_size
+
+    totalSizeFormatted = convert_bytes(totalSize)
+    print('Total size of timeline clips is ' + totalSizeFormatted)
+    print('DONE')
+    EnableAllButtons()
+
+def OnCopyRelinkClips(ev):
+    selectedPath = fusion.RequestDir()
+    print(selectedPath)
+    if selectedPath == None:
+        return
+    DisableAllButtons()
+    print('Working...')
+
+    timeline = project.GetCurrentTimeline()
+    videoTrackCount = timeline.GetTrackCount("video")
+    for i in range(videoTrackCount):
+        items = timeline.GetItemListInTrack("video", i + 1)
+        for item in items:
+            name = item.GetName()
+            mediaItem = item.GetMediaPoolItem()
+            enabled = item.GetClipEnabled()
+            if mediaItem != None and enabled == True:
+                path = mediaItem.GetClipProperty('File Path')
+                baseName = os.path.basename(path)
+                newFileDest = os.path.join(selectedPath, baseName)
+                isFile = os.path.isfile(newFileDest)
+
+                print("Copying file " + path)
+                if isFile == False:
+                    newFile = shutil.copy(path, selectedPath)
+                    print("Copy done. Replacing clip...")
+                    mediaItem.ReplaceClip(newFile)
+                else:
+                    print("Skipping file. Already exists.")
+
+    print('DONE')
+    EnableAllButtons()
+
 def OnCopyAssets(ev):
     selectedPath = fusion.RequestDir()
     print(selectedPath)
@@ -428,6 +498,8 @@ win.On[winID].Close = OnClose
 win.On['ImportMC'].Clicked = OnExec
 win.On['ColorClips'].Clicked = OnColorClips
 win.On['Musatiedot'].Clicked = OnMusatiedot
+win.On['CopyRelinkClips'].Clicked = OnCopyRelinkClips
+win.On['CalculateClips'].Clicked = OnCalculateClips
 win.On['ClearShots'].Clicked = OnClearShots
 win.On['ImportMultiMC'].Clicked = OnImportMultiMC
 win.On['ShowConsole'].Clicked = OnShowConsole
