@@ -6,7 +6,7 @@ import avb
 from reportlab.pdfgen.canvas import Canvas
 
 winID = "com.kelokorpi.toolkit"
-version = 'v1.5.0'
+version = 'v1.5.2'
 
 # Settings
 supportedMediaFiles = ['.MXF', '.MP4', '.MOV', '.WAV', '.CRM']
@@ -240,10 +240,16 @@ def OnMusatiedot(ev):
     audioTrackCount = timeline.GetTrackCount("audio")
     print('test')
     for i in range(audioTrackCount):
+        trackName = timeline.GetTrackName("audio", i + 1)
+        if not "Music" in trackName:
+            continue
         items = timeline.GetItemListInTrack("audio", i + 1)
         print('test2')
         for item in items:
             name = item.GetName()
+            enabled = item.GetClipEnabled()
+            if enabled is False:
+                continue
             if ".wav" in name and " - " in name and not "SFX" in name:
                 isEpidemic = False
                 if "ES_" in name:
@@ -365,6 +371,8 @@ def OnCalculateClips(ev):
 
     totalSize = 0
 
+    calculatedClips = []
+
     timeline = project.GetCurrentTimeline()
     videoTrackCount = timeline.GetTrackCount("video")
     for i in range(videoTrackCount):
@@ -376,8 +384,10 @@ def OnCalculateClips(ev):
             if mediaItem != None and enabled == True:
                 path = mediaItem.GetClipProperty('File Path')
                 baseName = os.path.basename(path)
-                file_stats = os.stat(path)
-                totalSize = totalSize + file_stats.st_size
+                if path not in calculatedClips:
+                    calculatedClips.append(path)
+                    file_stats = os.stat(path)
+                    totalSize = totalSize + file_stats.st_size
 
     totalSizeFormatted = convert_bytes(totalSize)
     print('Total size of timeline clips is ' + totalSizeFormatted)
@@ -413,6 +423,7 @@ def OnCopyRelinkClips(ev):
                     mediaItem.ReplaceClip(newFile)
                 else:
                     print("Skipping file. Already exists.")
+                    mediaItem.ReplaceClip(newFileDest)
 
     print('DONE')
     EnableAllButtons()
